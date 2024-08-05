@@ -1,13 +1,20 @@
 # focus-demo-sim
 This repo is for simulating the sim trains on the demo dashboard. It replays train telemetry from the cloud for trains defined in `train_config.json` file 
 
-## Installation and Usage
+## Installation 
 ```
 git clone https://github.com/Humatics/focus-demo-sim.git
 cd focus-demo-sim
 pip install -r requirements.txt
 python sim_client.py
 ```
+
+## Usage 
+After running sim_client.py, the train telemetry data for trains will be sent to TB. 
+*  Press 1 to send alarm
+*  Press 2 to delete most recent sent alarm 
+*  Press 0 to exit program
+
 
 ### Optional arguments 
 ```
