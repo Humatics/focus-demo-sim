@@ -1,8 +1,8 @@
 import logging
 import pandas as pd
 import argparse
-import random
 import json
+import numpy as np
 import time
 import threading
 from tb_gateway_mqtt import TBDeviceMqttClient
@@ -14,33 +14,37 @@ from tb_rest_client.rest_client_pe import RestClientPE
 from dataclasses import dataclass
 import numpy
 from datetimehandler import DateTimeHandler
+from dotenv import load_dotenv
+import os
 
-
+load_dotenv()
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=MissingPivotFunction)
 
-
-# Thingboard Variables
-TB_ACCESS_TOKENS = {"101": "DizKqRfajWFk8d9ei2Et", "107": "sdhcrt37hvvb074t25mj"}
-TB_SERVER = "mqtt.thingsboard.cloud"
+# Get TB creds
+TB_ACCESS_TOKENS = {
+    "101": os.getenv("101_ACCESS_TOKEN"),
+    "107": os.getenv("107_ACCESS_TOKEN"),
+}
+TB_SERVER = os.getenv("TB_SERVER")
 TB_PORT = 8883
-TB_ALARM_DEVICE_TOKEN = "23pGa0husleuYWSZIB6a"
+TB_ALARM_DEVICE_TOKEN = os.getenv("TB_ALARM_DEVICE_TOKEN")
 
-# Influx Variables
-INFLUX_METRICS_BUCKET = "agg_system_metrics_downsampled"
-INFLUX_LOCATION_BUCKET = "agg_data"
-INFLUX_ORG = "humatics_focus"
-INFLUX_TOKEN = "80qC-r4muraROg-Lc_joUimIW1CJjeLUnO3KqBpMVm_DzEyFyWX1nW-MJWKO4D2ulMnXhbNoh-97Co50Rc392Q=="
-INFLUX_URL = "https://us-east-1-1.aws.cloud2.influxdata.com"
+
+# Get influx creds
+INFLUX_METRICS_BUCKET = os.getenv("INFLUX_METRICS_BUCKET")
+INFLUX_LOCATION_BUCKET = os.getenv("INFLUX_LOCATION_BUCKET")
+INFLUX_ORG = os.getenv("INFLUX_ORG")
+INFLUX_TOKEN = os.getenv("INFLUX_TOKEN")
+INFLUX_URL = os.getenv("INFLUX_URL")
 
 # Default Tenant Administrator credentials
-username = "macos@test.com"
-password = "test@12345"
+username = os.getenv("TENANT_USERNAME")
+password = os.getenv("TENANT_PASSWORD")
 
 
 logging.basicConfig(level=logging.DEBUG)
 
-exit_event = threading.Event()
 influx_client = None
 args_ = None
 fields = [
@@ -55,7 +59,6 @@ fields = [
     "velocity_z",
     "rtk_status",
 ]
-alarmSent = []
 
 
 @dataclass
@@ -84,14 +87,17 @@ def get_value_from_df(df: pd.DataFrame, measurement: str, field: str):
     return val
 
 
+
+## Function to get data from influx cloud
 def replay_cloud_data(
     host_info: dict, query_handler: DateTimeHandler = None
 ) -> pd.DataFrame:
     query_handler.range = 60
     start, stop = query_handler.get_query_start_stop()
 
-    if (query_handler.step_time() == 1) and not args_.Loop:
-        return None
+    print(start, stop)
+    if (query_handler.step_time() == 1) and not False:
+        return 2
 
     cfg = {
         "org": "humatics_focus",
@@ -100,9 +106,70 @@ def replay_cloud_data(
     }
     query_api = influx_client.query_api()
 
+    ## __--------------------- OLD QUERY __------------------------
+    # query = f"""
+    #     import "math"
+    #     data_MTi680 = from(bucket: "{cfg['data_bucket']}")
+    #         |> range(start: {start}, stop: {stop})
+    #         |> filter(fn: (r) => r["_measurement"] == "MTi-680G" """
+
+    # if host_info is not None:
+    #     for host_info_field in host_info:
+    #         host_info_value = host_info[host_info_field]
+    #         query += f''' and r["{host_info_field}"] == "{host_info_value}"'''
+    # query += ")\n"
+    # query += f"""|> filter(fn: (r) =>
+    #             r["_field"] == "latitude" or
+    #             r["_field"] == "longitude" or
+    #             r["_field"] == "altitude_ellipsoid" or
+    #             r["_field"] == "num_svs" or
+    #             r["_field"] == "num_sv" or
+    #             r["_field"] == "rtk_status" or
+    #             r["_field"] == "velocity_x" or
+    #             r["_field"] == "velocity_y" or
+    #             r["_field"] == "velocity_z"
+    #         )
+    #         |> fill(usePrevious: true)
+    #         velocity = data_MTi680
+    #             |> filter(fn: (r) => r["_field"] == "velocity_x" or r["_field"] == "velocity_y" or r["_field"] == "velocity_z")
+    #             |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+    #             |> drop(columns: ["_time"])
+    #             |> map(fn: (r) => ({{r with _time: r._time, "speed": math.sqrt(x: float(v: r.velocity_x^2.0 + r.velocity_y^2.0 + r.velocity_z^2.0))}}))
+    #             |> keep(columns: ["_measurement", "speed"])
+
+    #         speed = velocity
+    #             |> last(column: "speed")
+
+    #         max_speed = velocity
+    #             |> rename(columns: {{speed: "max_speed"}})
+    #             |> max(column: "max_speed")
+
+    #         avg_speed = velocity
+    #             |> rename(columns: {{speed: "avg_speed"}})
+    #             |> mean(column: "avg_speed")
+
+    #         distance = avg_speed
+    #             |> map(fn: (r) => ({{ r with distance: r.avg_speed * {query_handler._step * (1.0)} }}))
+    #             |> drop(columns: ["avg_speed"])
+
+    #         outGoing = data_MTi680
+    #             |> aggregateWindow(every: 10m, fn: last, createEmpty: false)
+    #             |> keep(columns: ["_measurement", "_field", "_time", "_value"])
+    #             |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+    #             |> sort(columns: ["_time"])
+    #             |> group(columns: ["_time"], mode:"by")
+
+    #         j1 = join(tables: {{avg_speed: avg_speed, max_speed: max_speed}}, on: ["_measurement"])
+    #         j2 = join(tables: {{distance: distance, speed: speed}}, on: ["_measurement"])
+    #         j3 = join(tables: {{j1: j1, j2: j2}}, on: ["_measurement"])
+    #         j4 = join(tables: {{j3: j3, outGoing: outGoing}}, on: ["_measurement"])
+
+    #         j4 |> yield(name: "mqttData")"""
+
+    # ---------------------- New Query ------------------------
     query = f"""
         import "math"
-        data_MTi680 = from(bucket: "{cfg['data_bucket']}")
+        from(bucket: "{cfg['data_bucket']}")
             |> range(start: {start}, stop: {stop})
             |> filter(fn: (r) => r["_measurement"] == "MTi-680G" """
 
@@ -111,49 +178,31 @@ def replay_cloud_data(
             host_info_value = host_info[host_info_field]
             query += f''' and r["{host_info_field}"] == "{host_info_value}"'''
     query += ")\n"
-
     query += f"""|> filter(fn: (r) =>
-                r["_field"] == "latitude" or r["_field"] == "longitude" or r["_field"] == "altitude_ellipsoid" or
-                r["_field"] == "num_svs" or r["_field"] == "num_sv" or r["_field"] == "rtk_status" or
-                r["_field"] == "velocity_x" or r["_field"] == "velocity_y" or r["_field"] == "velocity_z")
-            |> fill(usePrevious: true)
+                r["_field"] == "latitude" or
+                r["_field"] == "longitude" or
+                r["_field"] == "altitude_ellipsoid" or
+                r["_field"] == "num_svs" or
+                r["_field"] == "num_sv" or
+                r["_field"] == "rtk_status" or
+                r["_field"] == "velocity_x" or
+                r["_field"] == "velocity_y" or
+                r["_field"] == "velocity_z"
+            )
+            |> duplicate(column: "_stop", as: "_time")
+            |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+            |> map(fn: (r) => ({{r with
+                speed: math.sqrt(x: float(v: r.velocity_x^2.0 + r.velocity_y^2.0 + r.velocity_z^2.0))
+            }}))
+            |> map(fn: (r) => ({{r with
+                distance: r.speed * {query_handler._step * 1.0},
+                
+            }}))
+            |> group(columns: ["_time"], mode: "by")
+            |> drop(columns: ["_start", "_stop", "host", "line", "operator", "train"])
+            |> yield(name: "mqttData")"""
 
-            velocity = data_MTi680
-                |> filter(fn: (r) => r["_field"] == "velocity_x" or r["_field"] == "velocity_y" or r["_field"] == "velocity_z")
-                |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-                |> drop(columns: ["_time"])
-                |> map(fn: (r) => ({{r with _time: r._time, "speed": math.sqrt(x: float(v: r.velocity_x^2.0 + r.velocity_y^2.0 + r.velocity_z^2.0))}}))
-                |> keep(columns: ["_measurement", "speed"])
-
-            speed = velocity
-                |> last(column: "speed")
-
-            max_speed = velocity
-                |> rename(columns: {{speed: "max_speed"}})
-                |> max(column: "max_speed")
-
-            avg_speed = velocity
-                |> rename(columns: {{speed: "avg_speed"}})
-                |> mean(column: "avg_speed")
-
-            distance = avg_speed
-                |> map(fn: (r) => ({{ r with distance: r.avg_speed * {query_handler._step * (1.0)} }}))
-                |> drop(columns: ["avg_speed"])
-
-            outGoing = data_MTi680
-                |> aggregateWindow(every: 10m, fn: last, createEmpty: false)
-                |> keep(columns: ["_measurement", "_field", "_time", "_value"])
-                |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-                |> sort(columns: ["_time"])
-                |> group(columns: ["_time"], mode:"by")
-
-            j1 = join(tables: {{avg_speed: avg_speed, max_speed: max_speed}}, on: ["_measurement"])
-            j2 = join(tables: {{distance: distance, speed: speed}}, on: ["_measurement"])
-            j3 = join(tables: {{j1: j1, j2: j2}}, on: ["_measurement"])
-            j4 = join(tables: {{j3: j3, outGoing: outGoing}}, on: ["_measurement"])
-
-            j4 |> yield(name: "mqttData")
-            """
+    # print(query)
 
     try:
         result = query_api.query_data_frame(query, org=INFLUX_ORG)
@@ -192,7 +241,7 @@ def replay_cloud_data(
     try:
         result = query_api.query_data_frame(org=INFLUX_ORG, query=query)
     except Exception as e:
-        logging.warning(f"Location data query failed: {e}")
+        logging.warning(f"Acceleration data query failed: {e}")
         return None
     if result.empty:
         logging.warning("Empty query: skipping")
@@ -211,8 +260,11 @@ def replay_cloud_data(
     telemetry["line"] = "demo"
     telemetry["train"] = "Sim 101" if host_info["train"] == "101" else "Sim 107"
 
-    # with open("data.json", "w", encoding="utf-8") as f:
-    #     json.dump(telemetry, f, ensure_ascii=False, indent=4)
+
+    print(telemetry["speed"], telemetry["latitude"], telemetry["latitude"])
+
+    with open("data.json", "w", encoding="utf-8") as f:
+        json.dump(telemetry, f, ensure_ascii=False, indent=4)
 
     return QueryResults(telemetry=telemetry)
 
@@ -233,26 +285,39 @@ def publish_results(
             else:
                 logging.info(f"Published telemetry to {results_message['train']} ")
     except Exception as e:
-        logging.warning(f" Failed to publish to Thingsboard: {e}")
+        logging.exception(f" Failed to publish to Thingsboard: {e}")
 
 
 def execute_query(
-    tb_client: TBDeviceMqttClient, host_info: dict, seconds_between_queries: int
+    start: str,
+    duration: str,
+    tb_client,
+    host_info: dict,
+    seconds_between_queries: int,
+    trip_num,
 ):
-    query_handler = DateTimeHandler(
-        60, args_.Start, args_.Duration, seconds_between_queries
-    )
-    while not tb_client.stopped:
+    query_handler = DateTimeHandler(60, start, duration, seconds_between_queries)
+    rows = []
+    while True:
         results = replay_cloud_data(host_info, query_handler)
         if results is not None:
+            if results == 2:
+                break
+            rows.append(results.telemetry)
             publish_results(tb_client, results.telemetry)
 
-        time.sleep(seconds_between_queries)
+        ## Adjust sleep based on animation (duration in seconds) - 1  in widget code.
+        ## Duration 1000 = time.sleep(0). Duration 10000 = time.sleep(9).  
+        # time.sleep(1)
+    if trip_num:
+        name = "_".join(host_info.values()) +'_trip_'+ trip_num + ".parquet"
+        df = pd.DataFrame.from_dict(rows)
+        df.to_parquet(name)
 
-
-def toCloud(input_params: argparse.Namespace, operator: str, line: str, train_num: str):
+## Get Data from cloud 
+def toCloud(start, duration, operator: str, line: str, train_num: str, trip_number):
     global influx_client, args_
-    args_ = input_params
+    # args_ = input_params
 
     host_info = {"operator": operator, "line": line, "train": train_num}
 
@@ -264,215 +329,229 @@ def toCloud(input_params: argparse.Namespace, operator: str, line: str, train_nu
         TB_SERVER, TB_PORT, TB_ACCESS_TOKENS[train_num], quality_of_service=0
     )
     tb_client.connect(tls=True, ca_certs="thingsboard/ca-root.pem", keepalive=60)
-    execute_query(tb_client, host_info, 10)
+    execute_query(start, duration, None, host_info, 1, trip_number)
 
 
+
+## Old code. May not be needed anymore 
 def parse_args():
     argParser = argparse.ArgumentParser()
     argParser.add_argument(
         "-s",
         "--Start",
         help="Start time of query: 2023-12-01T12:01:02.000Z",
-        default="2024-07-25T10:15:00.000000Z",
+        default="2024-07-23T19:36:25.000000Z",
         nargs="?",
     )
     argParser.add_argument(
         "-d",
         "--Duration",
         help="Duration after start time to replay data: 1:30:00",
-        default="00:30:00",
+        default="01:30:00",
         nargs="?",
     )
     argParser.add_argument(
         "-l",
         "--Loop",
         help="If flag is set, replay will loop after completion",
-        action="store_true",
+        action="store_false",
     )
 
     return argParser.parse_args()
 
 
-def get_alarms_fromTB(
-    client: RestClientPE,
-    pageSize: int = 1,
-    text: str = None,
-):
-    res = client.get_all_alarms(page_size=pageSize, page=0, text_search=text)
-    return res.data
+def sim_rtd():
+    ## Load rtd_location data per second
+    loc_data = pd.read_parquet("rtd_sim.parquet")
 
-
-def modify_alert(alert_to_sent, tb_queried_alert):
-    ## modify alert with alert queried from TB
-    alert_to_sent["lastDetection"]["location"]["latitude"] = tb_queried_alert.details[
-        "latitude"
-    ]
-    alert_to_sent["lastDetection"]["location"]["longitude"] = tb_queried_alert.details[
-        "longitude"
-    ]
-
-    alert_to_sent["summary"]["compositeAlertID"] = tb_queried_alert.details[
-        "compositeAlertID"
-    ]
-    alert_to_sent["summary"]["customerAlertID"] = (
-        "DEMO-" + tb_queried_alert.details["customerAlertID"].split("-")[1]
+    ## Create TB client for RTD Device
+    client = TBDeviceMqttClient(
+        TB_SERVER, TB_PORT, "JOCAx4sLqukyDW3UlTnG", quality_of_service=0
     )
+    client.connect(tls=True, ca_certs="thingsboard/ca-root.pem", keepalive=60)
 
-    alert_to_sent["lastDetection"]["classification"][0]["severity"] = (
-        tb_queried_alert.details["criticality"]
+    telemetry = {
+        "line": "d-line",
+        "operator": "rtd",
+        "train": "RTD D-line",
+        "stationing": 0,
+    }
+
+    while True:
+        for i in range(0, len(loc_data), 10):
+            # print(loc_data.iloc[i]['lat'] , loc_data.iloc[i]['long'] )
+            telemetry["latitude"] = loc_data.iloc[i]["lat"]
+            telemetry["longitude"] = loc_data.iloc[i]["long"]
+            telemetry["speed"] = loc_data.iloc[i]["speed"]
+            publish_results(client, telemetry)
+            time.sleep(10)
+
+
+
+import datetime
+
+
+def train_101():
+    ## Load rtd_location data per second
+    trip_1 = pd.read_parquet("njt_nlr_101_trip1.parquet")
+    trip_2 = pd.read_parquet("njt_nlr_101_trip1.parquet")
+
+    ## Create TB client for RTD Device
+    client = TBDeviceMqttClient(
+        TB_SERVER, TB_PORT, TB_ACCESS_TOKENS["101"], quality_of_service=0
     )
-    alert_to_sent["summary"]["firstDetected"] = tb_queried_alert.details[
-        "first_detect_date"
-    ]
-    alert_to_sent["summary"]["lastDetected"] = tb_queried_alert.details[
-        "last_detect_date"
-    ]
-    alert_to_sent["lastDetection"]["defectTypeName"] = tb_queried_alert.details["name"]
-    alert_to_sent["lastDetection"]["trainsDetected"] = tb_queried_alert.details[
-        "trains_detected_by"
-    ]
+    client.connect(tls=True, ca_certs="thingsboard/ca-root.pem", keepalive=60)
 
-    alert_to_sent["lastDetection"]["speed"]["min"] = tb_queried_alert.details[
-        "min_speed"
-    ]
-    alert_to_sent["lastDetection"]["speed"]["avg"] = tb_queried_alert.details[
-        "avg_speed"
-    ]
-    alert_to_sent["lastDetection"]["speed"]["max"] = tb_queried_alert.details[
-        "max_speed"
-    ]
+    telemetry = {
+        "line": "demo",
+        "operator": "demo",
+        "host": "demo",
+        "train": "Sim 101",
+        "stationing": 0,
+    }
 
-    alert_to_sent["summary"]["totalDetections"] = tb_queried_alert.details[
-        "detections_per_day"
-    ]
-    alert_to_sent["lastDetection"]["plot"] = tb_queried_alert.details["plot"]
+    while True:
+        # First Part of the trip
+        for i in range(0, len(trip_1)):
+            telemetry["latitude"] = trip_1.iloc[i]["latitude"]
+            telemetry["longitude"] = trip_1.iloc[i]["longitude"]
+            telemetry["speed"] = trip_1.iloc[i]["speed"]
+            telemetry['heading'] = 'South Bound'
 
-    return alert_to_sent
+            # print(telemetry)
 
-
-def send_random_alarm():
-    global alarmSent
-    TB = ThingsboardInterface("testemail45@email.com", "test12345")
-
-    ## Get previously send alarms if any
-    if not alarmSent:
-        logging.info("Getting alarms sent till now...")
-        with open("alert_sent.txt", "r") as file:
-            alarmSent = [line.rstrip("\n") for line in file]
-
-    alarm_client = TBDeviceMqttClient(
-        TB_SERVER, TB_PORT, TB_ALARM_DEVICE_TOKEN, quality_of_service=1
-    )
-    alarm_client.connect(tls=True, ca_certs="thingsboard/ca-root.pem", keepalive=30)
-
-    time.sleep(1)
-
-    ## Get random alert from NJT customer
-    tb_alert = random.choice(get_alarms_fromTB(TB.rest_client, pageSize=50))
-
-    ## Base alert details
-    with open("alert.json", "r") as f:
-        base = json.load(f)
-
-    alert = modify_alert(base, tb_alert)
-
-    ## Keep track of alarms sent
-    alertID = alert["summary"]["compositeAlertID"]
-    alarmSent.append(alertID)
-
-    ## Publish alarm to TB track receiver
-    publish_results(alarm_client, alert, isAlram=True)
-
-
-def alarmDelete():
-    global alarmSent
-    TB = ThingsboardInterface("testAdmin@gmailf.wd", "test12345")
-
-    ## Get previously send alarms if any
-    if not alarmSent:
-        logging.info("Getting alarms sent till now...")
-        with open("alert_sent.txt", "r") as file:
-            alarmSent = [line.rstrip("\n") for line in file]
-
-    logging.info(f"Alarms sent till now - {alarmSent}")
-
-    if not alarmSent:
-        logging.info("No alerts on file")
-        return
-
-    try:
-        res = get_alarms_fromTB(TB.rest_client, text=alarmSent[-1])
-
-        if not res:
-            logging.info("No Alarms to delete...")
-            return
-
-        alarmID = res[0].id.id
-
-        logging.info(f"Deleting alarm with ID- {alarmID}")
-        # First acknowledge alarm, then clear it then delete it.
-        res = TB.rest_client.ack_alarm(alarm_id=alarmID)
-        time.sleep(1)
-        if res.acknowledged:
-            res = TB.rest_client.clear_alarm(alarm_id=alarmID)
-
+            publish_results(client, telemetry)
             time.sleep(1)
-            if res.cleared:
-                res = TB.rest_client.delete_alarm(alarm_id=alarmID)
 
-        ## remove alertID from list
-        alarmSent.pop()
-
-    except Exception as e:
-        logging.error(e)
+        print("Trip 1 completed ")
+        time.sleep(60)                          ## Interval between two trips in seconds 
+        print("Starting Trip 2")
 
 
-def closing():
-    ## Function to log alert sent for future use
-    logging.info("Saving alert sent")
-    with open("alert_sent.txt", "+w") as f:
-        for id in alarmSent:
-            f.write(str(id) + "\n")
+        # ## Reverse trip
+        for i in range(0, len(trip_2)):
+            telemetry["latitude"] = trip_2.iloc[i]["latitude"]
+            telemetry["longitude"] = trip_2.iloc[i]["longitude"]
+            telemetry["speed"] = trip_2.iloc[i]["speed"]
+            telemetry['heading'] = 'North Bound'
+
+            # telemetry['stationing'] = trip_1.iloc[i]['atp'] if trip_1.iloc[i]['atp'] != numpy.nan else trip_1.iloc[i]['atp']
+            # telemetry['track'] = trip_1.iloc[i]['track']
+            # print(telemetry)
+
+            # print(telemetry["speed"], telemetry["latitude"], telemetry["latitude"])
+
+            publish_results(client, telemetry)
+            time.sleep(1)
+
+
+def train_107():
+    ## Load 107 location data per second
+    trip_1 = pd.read_parquet("njt_nlr_107_trip1.parquet")
+    trip_2 = pd.read_parquet("njt_nlr_107_trip1.parquet")
+
+    ## Create TB client for RTD Device
+    client = TBDeviceMqttClient(
+        TB_SERVER, TB_PORT, TB_ACCESS_TOKENS["107"], quality_of_service=0
+    )
+    client.connect(tls=True, ca_certs="thingsboard/ca-root.pem", keepalive=60)
+
+    telemetry = {
+        "line": "demo",
+        "operator": "demo",
+        "host": "demo",
+        "train": "Sim 107",
+        "stationing": 0,
+    }
+
+    while True:
+        # Trip 1
+        for i in range(0, len(trip_1)):
+            telemetry["latitude"] = trip_1.iloc[i]["latitude"]
+            telemetry["longitude"] = trip_1.iloc[i]["longitude"]
+            telemetry["speed"] = trip_1.iloc[i]["speed"]
+            telemetry['heading'] = 'North Bound'
+
+            # telemetry['stationing'] = trip_1.iloc[i]['atp'] if trip_1.iloc[i]['atp'] != numpy.nan else trip_1.iloc[i]['atp']
+            # telemetry['track'] = trip_1.iloc[i]['track']
+            print(telemetry)
+
+            publish_results(client, telemetry)
+            time.sleep(1)
+
+        print('Trip 1 completed')
+        time.sleep(10)                              # interval between trips in seconds 
+        print('Starting Trip 2')
+
+        ## Trip 2
+        for i in range(0, len(trip_1)):
+            telemetry["latitude"] = trip_2.iloc[i]["latitude"]
+            telemetry["longitude"] = trip_2.iloc[i]["longitude"]
+            telemetry["speed"] = trip_2.iloc[i]["speed"]
+            telemetry['heading'] = 'South Bound'
+            # telemetry['stationing'] = trip_1.iloc[i]['atp'] if trip_1.iloc[i]['atp'] != numpy.nan else trip_1.iloc[i]['atp']
+            # telemetry['track'] = trip_1.iloc[i]['track']
+            print(telemetry)
+
+            publish_results(client, telemetry)
+            time.sleep(1)
 
 
 if __name__ == "__main__":
-    args_ = parse_args()
+    # args_ = parse_args()
 
-    with open("train_config.json", "r") as f:
-        config = json.load(f)
+    ## Gather data for specific train and timestamp
+    # sim_101 = threading.Thread(
+    #     target=toCloud,
+    #     args=("2024-10-4T13:40:35.000000Z", "00:14:20", "njt", "nlr", "101", "_1_sec_interval"),
+    # )
+    # sim_101.start()
+    # sim_101.join()
 
-    # Start sim trains on seperate threads
-    for operator in config:
-        for line in config[operator]:
-            for train in config[operator][line]:
-                sim_thread = threading.Thread(
-                    target=toCloud, args=(args_, operator, line, train)
-                )
-                sim_thread.daemon = True
-                sim_thread.start()
+    ''' 1 - {
+            101 : trip from Grove to Norfolk (South Bound)
+            107 : trip from Norfolk to Grove  (North Bound)
+        2 - {
+            101: trip from Norfolk to Grove (North Bound)
+            107  : trip from Grove to Norfolk (South Bound)
+        }
+    }'''
+    timestamps = {
+        1: {
+            101: {"start": "2024-10-4T13:10:55.000000Z", "duration": "00:15:25"},
+            107: {"start": "2024-09-18T12:10:50.000000", "duration": "00:15:00"},
+        },
+        2: {
+            101: {"start": "2024-10-4T13:40:50.000000Z", "duration": "00:14:20"},
+            107: {"start": "2024-10-1T11:04:00.000000Z", "duration": "00:14:50"},
+        },
+    }
 
-    try:
-        while True:
-            user_input = input("Enter command: \n")
 
-            if user_input == "1":
-                thread = threading.Thread(target=send_random_alarm)
-                thread.start()
-                thread.join()
+    ## Gather data for all trains 
+    # for trip_number, trains in timestamps.items():
+    #     trip_threads = []
+    #     for train_number, data in trains.items():
+    #         thread = threading.Thread(
+    #             target=toCloud,
+    #             args=(
+    #                 data["start"],
+    #                 data["duration"],
+    #                 "njt",
+    #                 "nlr",
+    #                 str(train_number),
+    #                 str(trip_number),
+    #             ),
+    #         )
+    #         trip_threads.append(thread)
+    #         thread.start()
+    #     for thread in trip_threads:
+    #         thread.join()
+    #     print(f"Trip {trip_number} finished ")
+    #     time.sleep(20)
 
-            elif user_input == "2":
-                thread = threading.Thread(target=alarmDelete)
-                thread.start()
-                thread.join()
 
-            elif user_input == "3":
-                ## Debug print
-                logging.info(f"Alarms sent till now - {alarmSent}")
 
-            elif user_input.lower() == "0":
-                closing()
-                break
-            else:
-                print("Unknown command.")
-    except KeyboardInterrupt:
-        closing()
+    threading.Thread(target=train_101).start()
+    threading.Thread(target=train_107).start()
+    # threading.Thread(target=sim_rtd).start()
