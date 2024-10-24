@@ -1,6 +1,7 @@
 influxdb_client==1.44.0
-numpy==2.0.1
-pandas==2.2.2
+numpy==2.1.2
+pandas==2.2.3
+python-dotenv==1.0.1
 python_dateutil==2.8.2
 pytz==2023.3.post1
 tb_rest_client==3.7.0
