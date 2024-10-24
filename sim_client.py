@@ -435,7 +435,7 @@ def train_101():
             telemetry["longitude"] = trip_2.iloc[i]["longitude"]
             telemetry["speed"] = trip_2.iloc[i]["speed"]
             telemetry['heading'] = 'North Bound'
-            telemetry['stationing'] = trip_1.iloc[i]['atp'] 
+            telemetry['stationing'] = trip_2.iloc[i]['atp'] 
 
             # telemetry['track'] = trip_1.iloc[i]['track']
             # print(telemetry)
@@ -484,12 +484,12 @@ def train_107():
         print('Starting Trip 2')
 
         ## Trip 2
-        for i in range(0, len(trip_1)):
+        for i in range(0, len(trip_2)):
             telemetry["latitude"] = trip_2.iloc[i]["latitude"]
             telemetry["longitude"] = trip_2.iloc[i]["longitude"]
             telemetry["speed"] = trip_2.iloc[i]["speed"]
             telemetry['heading'] = 'South Bound'
-            telemetry['stationing'] = trip_1.iloc[i]['atp'] 
+            telemetry['stationing'] = trip_2.iloc[i]['atp'] 
 
             # telemetry['track'] = trip_1.iloc[i]['track']
             # print(telemetry)
