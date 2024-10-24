@@ -7,3 +7,5 @@ cd focus-demo-sim
 pip install -r requirements.txt
 python sim_client.py
 ```
+
+pip install any missing dependency. 
