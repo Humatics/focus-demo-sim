@@ -2,7 +2,6 @@ import logging
 import pandas as pd
 import argparse
 import json
-import numpy as np
 import time
 import threading
 from tb_gateway_mqtt import TBDeviceMqttClient
@@ -393,8 +392,8 @@ import datetime
 
 def train_101():
     ## Load rtd_location data per second
-    trip_1 = pd.read_parquet("njt_nlr_101_trip1.parquet")
-    trip_2 = pd.read_parquet("njt_nlr_101_trip1.parquet")
+    trip_1 = pd.read_parquet("njt_nlr_101_trip1_with_stationing_YH.parquet")
+    trip_2 = pd.read_parquet("njt_nlr_101_trip2_with_stationing_YH.parquet")
 
     ## Create TB client for RTD Device
     client = TBDeviceMqttClient(
@@ -417,7 +416,9 @@ def train_101():
             telemetry["longitude"] = trip_1.iloc[i]["longitude"]
             telemetry["speed"] = trip_1.iloc[i]["speed"]
             telemetry['heading'] = 'South Bound'
+            telemetry['stationing'] = trip_1.iloc[i]['atp'] 
 
+            ## debug print
             # print(telemetry)
 
             publish_results(client, telemetry)
@@ -434,12 +435,10 @@ def train_101():
             telemetry["longitude"] = trip_2.iloc[i]["longitude"]
             telemetry["speed"] = trip_2.iloc[i]["speed"]
             telemetry['heading'] = 'North Bound'
+            telemetry['stationing'] = trip_1.iloc[i]['atp'] 
 
-            # telemetry['stationing'] = trip_1.iloc[i]['atp'] if trip_1.iloc[i]['atp'] != numpy.nan else trip_1.iloc[i]['atp']
             # telemetry['track'] = trip_1.iloc[i]['track']
             # print(telemetry)
-
-            # print(telemetry["speed"], telemetry["latitude"], telemetry["latitude"])
 
             publish_results(client, telemetry)
             time.sleep(1)
@@ -447,8 +446,8 @@ def train_101():
 
 def train_107():
     ## Load 107 location data per second
-    trip_1 = pd.read_parquet("njt_nlr_107_trip1.parquet")
-    trip_2 = pd.read_parquet("njt_nlr_107_trip1.parquet")
+    trip_1 = pd.read_parquet("njt_nlr_107_trip1_with_stationing_YH.parquet")
+    trip_2 = pd.read_parquet("njt_nlr_107_trip2_with_stationing_YH.parquet")
 
     ## Create TB client for RTD Device
     client = TBDeviceMqttClient(
@@ -471,8 +470,9 @@ def train_107():
             telemetry["longitude"] = trip_1.iloc[i]["longitude"]
             telemetry["speed"] = trip_1.iloc[i]["speed"]
             telemetry['heading'] = 'North Bound'
+            telemetry['stationing'] = trip_1.iloc[i]['atp'] 
 
-            # telemetry['stationing'] = trip_1.iloc[i]['atp'] if trip_1.iloc[i]['atp'] != numpy.nan else trip_1.iloc[i]['atp']
+
             # telemetry['track'] = trip_1.iloc[i]['track']
             print(telemetry)
 
@@ -480,7 +480,7 @@ def train_107():
             time.sleep(1)
 
         print('Trip 1 completed')
-        time.sleep(10)                              # interval between trips in seconds 
+        time.sleep(60)                              # interval between trips in seconds 
         print('Starting Trip 2')
 
         ## Trip 2
@@ -489,9 +489,10 @@ def train_107():
             telemetry["longitude"] = trip_2.iloc[i]["longitude"]
             telemetry["speed"] = trip_2.iloc[i]["speed"]
             telemetry['heading'] = 'South Bound'
-            # telemetry['stationing'] = trip_1.iloc[i]['atp'] if trip_1.iloc[i]['atp'] != numpy.nan else trip_1.iloc[i]['atp']
+            telemetry['stationing'] = trip_1.iloc[i]['atp'] 
+
             # telemetry['track'] = trip_1.iloc[i]['track']
-            print(telemetry)
+            # print(telemetry)
 
             publish_results(client, telemetry)
             time.sleep(1)
