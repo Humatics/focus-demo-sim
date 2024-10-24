@@ -1,4 +1,9 @@
 focus-demo-sim
 
-# Install necessary modules - 
-`pip install -r requirements.txt`
+## Working - 
+```
+git clone https://github.com/Humatics/focus-demo-sim.git
+cd focus-demo-sim
+pip install -r requirements.txt
+python sim_client.py
+```
