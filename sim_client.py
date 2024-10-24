@@ -417,6 +417,7 @@ def train_101():
             telemetry["speed"] = trip_1.iloc[i]["speed"]
             telemetry['heading'] = 'South Bound'
             telemetry['stationing'] = trip_1.iloc[i]['atp'] 
+            telemetry['trackNum'] = '2'
 
             ## debug print
             # print(telemetry)
@@ -436,6 +437,7 @@ def train_101():
             telemetry["speed"] = trip_2.iloc[i]["speed"]
             telemetry['heading'] = 'North Bound'
             telemetry['stationing'] = trip_2.iloc[i]['atp'] 
+            telemetry['trackNum'] = '1'
 
             # telemetry['track'] = trip_1.iloc[i]['track']
             # print(telemetry)
@@ -471,9 +473,7 @@ def train_107():
             telemetry["speed"] = trip_1.iloc[i]["speed"]
             telemetry['heading'] = 'North Bound'
             telemetry['stationing'] = trip_1.iloc[i]['atp'] 
-
-
-            # telemetry['track'] = trip_1.iloc[i]['track']
+            telemetry['trackNum'] = '1'
             print(telemetry)
 
             publish_results(client, telemetry)
@@ -490,8 +490,8 @@ def train_107():
             telemetry["speed"] = trip_2.iloc[i]["speed"]
             telemetry['heading'] = 'South Bound'
             telemetry['stationing'] = trip_2.iloc[i]['atp'] 
+            telemetry['trackNum'] = '2'
 
-            # telemetry['track'] = trip_1.iloc[i]['track']
             # print(telemetry)
 
             publish_results(client, telemetry)
