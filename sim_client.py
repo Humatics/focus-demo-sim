@@ -409,7 +409,7 @@ def train_101():
         "stationing": 0,
     }
 
-    while True:
+    while not client.stopped:
         # First Part of the trip
         for i in range(0, len(trip_1)):
             telemetry["latitude"] = trip_1.iloc[i]["latitude"]
@@ -465,7 +465,7 @@ def train_107():
         "stationing": 0,
     }
 
-    while True:
+    while not client.stopped:
         # Trip 1
         for i in range(0, len(trip_1)):
             telemetry["latitude"] = trip_1.iloc[i]["latitude"]
