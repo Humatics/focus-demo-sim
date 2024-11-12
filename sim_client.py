@@ -397,7 +397,7 @@ def train_101():
 
     ## Create TB client for RTD Device
     client = TBDeviceMqttClient(
-        TB_SERVER, TB_PORT, TB_ACCESS_TOKENS["101"], quality_of_service=0
+        TB_SERVER, TB_PORT, TB_ACCESS_TOKENS["101"], quality_of_service=0, rate_limit='100:1,3000:60,70000:3600'
     )
     client.connect(tls=True, ca_certs="thingsboard/ca-root.pem", keepalive=60)
 
@@ -420,13 +420,14 @@ def train_101():
             telemetry['trackNum'] = '2'
 
             ## debug print
-            # print(telemetry)
+            print(telemetry)
 
+            # if speed_zero_counter == 5:
             publish_results(client, telemetry)
-            time.sleep(1)
+            time.sleep(1.5)
 
-        print("Trip 1 completed ")
-        time.sleep(60)                          ## Interval between two trips in seconds 
+        print("101 Trip 1 completed ")
+        time.sleep(300)                          ## Interval between two trips in seconds 
         print("Starting Trip 2")
 
 
@@ -443,7 +444,11 @@ def train_101():
             # print(telemetry)
 
             publish_results(client, telemetry)
-            time.sleep(1)
+            time.sleep(1.5)
+
+        print("101 Trip 2 completed ")
+        time.sleep(300)                          ## Interval between two trips in seconds 
+        print("Starting Trip 1")
 
 
 def train_107():
@@ -453,9 +458,9 @@ def train_107():
 
     ## Create TB client for RTD Device
     client = TBDeviceMqttClient(
-        TB_SERVER, TB_PORT, TB_ACCESS_TOKENS["107"], quality_of_service=0
+        TB_SERVER, TB_PORT, TB_ACCESS_TOKENS["107"], quality_of_service=0 , rate_limit='200:1,6000:60,70000:3600'
     )
-    client.connect(tls=True, ca_certs="thingsboard/ca-root.pem", keepalive=60)
+    client.connect(tls=True, ca_certs="thingsboard/ca-root.pem", keepalive=120)
 
     telemetry = {
         "line": "demo",
@@ -474,13 +479,13 @@ def train_107():
             telemetry['heading'] = 'North Bound'
             telemetry['stationing'] = trip_1.iloc[i]['atp'] 
             telemetry['trackNum'] = '1'
-            print(telemetry)
+            # print(telemetry)
 
             publish_results(client, telemetry)
-            time.sleep(1)
+            time.sleep(1.5)
 
-        print('Trip 1 completed')
-        time.sleep(60)                              # interval between trips in seconds 
+        print('107 Trip 1 completed')
+        time.sleep(300)                              # interval between trips in seconds 
         print('Starting Trip 2')
 
         ## Trip 2
@@ -495,7 +500,11 @@ def train_107():
             # print(telemetry)
 
             publish_results(client, telemetry)
-            time.sleep(1)
+            time.sleep(1.5)
+        
+        print('107 Trip 2 completed')
+        time.sleep(300)                              # interval between trips in seconds 
+        print('Starting Trip 1')
 
 
 if __name__ == "__main__":
